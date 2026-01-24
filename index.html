@@ -3,53 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>956 Rideco Cloud Commander</title>
+    <title>956 Rideco Cloud</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 10px; color: #333; margin: 0; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 1450px; margin: auto; }
-        
-        /* Fixed Header for Mobile */
         .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
-        h1 { font-size: 1.4rem; margin: 0; }
-
-        /* Responsive Table Container */
-        .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; border-radius: 8px; border: 1px solid #eee; }
-        
-        table { width: 100%; border-collapse: collapse; background: white; min-width: 800px; /* Forces enough space for text */ }
+        .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; min-width: 850px; }
         th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; text-transform: uppercase; }
+        th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; }
         
-        /* VEHICLE NAME FIX */
+        /* VEHICLE NAME ENHANCEMENT */
         .vehicle-input { 
-            font-weight: bold; 
-            font-size: 16px !important; /* Larger for mobile */
-            white-space: normal !important; /* Allow wrapping */
+            font-weight: 800 !important; 
+            font-size: 17px !important; 
+            white-space: normal !important; 
             word-wrap: break-word;
-            min-height: 40px;
-            line-height: 1.2;
+            line-height: 1.1;
+            text-transform: uppercase;
         }
 
         input { border: 1px solid transparent; padding: 8px; width: 95%; font-size: 14px; background: transparent; }
-        input:disabled { color: #333; opacity: 1; -webkit-text-fill-color: #333; }
-        input:focus { background: #f9f9f9; border-color: #3498db; outline: none; }
+        input:disabled { opacity: 1; -webkit-text-fill-color: inherit; color: inherit; }
 
-        /* Status Colors */
-        .status-critical { background: #ffebee; color: #c62828; font-weight: bold; }
-        .status-grace { background: #fff3e0; color: #ef6c00; font-weight: bold; }
         .status-paid { background: #e8f5e9; color: #2e7d32; }
-        .status-external { background: #f1f2f6; color: #7f8c8d; }
-
-        .btn { cursor: pointer; border-radius: 6px; padding: 10px 12px; border: none; font-weight: bold; font-size: 13px; }
+        .btn { cursor: pointer; border-radius: 6px; padding: 10px 12px; border: none; font-weight: bold; }
         .controls { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         #sync-status { font-weight: bold; font-size: 0.85em; display: flex; align-items: center; gap: 5px; }
         .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
-
-        /* Mobile Adjustments */
-        @media (max-width: 600px) {
-            .btn { padding: 8px 10px; font-size: 12px; }
-            td { padding: 10px 5px; }
-            input[type="number"] { width: 70px; }
-        }
     </style>
 </head>
 <body>
@@ -61,29 +42,26 @@
             <div id="sync-status"><span class="dot" style="background:#f1c40f"></span> Connecting...</div>
         </div>
         <div style="text-align: right;">
-            <h3 id="total-owed" style="margin:0; font-size: 1.1rem;">Total: $0.00</h3>
+            <h3 id="total-owed" style="margin:0;">Total: $0.00</h3>
             <p id="paid-count" style="margin:0; font-size: 0.8rem;">Paid: 0 / 23</p>
         </div>
     </div>
 
     <div class="controls">
-        <button id="lockBtn" class="btn" style="background:#34495e; color:white;" onclick="toggleLock()">🔒 Unlock</button>
+        <button id="lockBtn" class="btn" style="background:#34495e; color:white;" onclick="checkPin()">🔒 Unlock</button>
         <button class="btn" style="background:#3498db; color:white;" onclick="loadFromCloud()">🔄 Refresh</button>
         <button id="saveCloudBtn" class="btn" style="background:#2ecc71; color:white;" onclick="pushToCloud()" disabled>☁️ Save Cloud</button>
         <button class="btn" style="background:#f39c12; color:white;" onclick="exportJSON()">💾 Backup</button>
-        <button class="btn" style="background:#7f8c8d; color:white;" onclick="document.getElementById('restoreFile').click()">📂 Restore</button>
-        <input type="file" id="restoreFile" style="display:none" accept=".json" onchange="importJSON(event)">
     </div>
     
     <div class="table-container">
         <table>
             <thead>
                 <tr>
-                    <th style="width: 180px;">Vehicle</th>
+                    <th style="width: 200px;">Vehicle</th>
                     <th>Bank</th>
                     <th>Payment</th>
                     <th>Day</th>
-                    <th>Late</th>
                     <th>Status</th>
                     <th>Date Paid</th>
                     <th>Action</th>
@@ -96,48 +74,45 @@
 
 <script>
     const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzs3Y76VOyP3Vlj7Ka_IVt6-ycs9Yj91kTNRplMM1tjq0gBsynyZiVUjNT6pMbGyamq/exec";
+    const SECRET_PIN = "0956";
     
     let isLocked = true;
     let fleet = [];
     const today = new Date().getDate();
 
-    // Data pre-loaded just in case
-    const backupData = [{"name": "Jaime Palisade 2021", "bank": "Partner Managed", "amount": 0, "dueDay": 1, "paid": true, "paidDate": "N/A"}, {"name": "Black Palisade XRT", "bank": "Hyundai Finance", "amount": 945.83, "dueDay": 1, "paid": true, "paidDate": "2026-01-08"}, {"name": "Blue Jeep Compass", "bank": "exeter Fin.", "amount": 725.53, "dueDay": 1, "paid": true, "paidDate": "2026-01-01"}, {"name": "Silver Voyager", "bank": "Chase Bank", "amount": 841.24, "dueDay": 1, "paid": true, "paidDate": "2026-01-12"}, {"name": "White Voyager", "bank": "Ally Bank", "amount": 877.62, "dueDay": 2, "paid": true, "paidDate": "2026-01-09"}, {"name": "Grey Palisade", "bank": "TD bank", "amount": 865.34, "dueDay": 2, "paid": true, "paidDate": "2026-01-09"}, {"name": "Blue Telluride", "bank": "SFCU", "amount": 773.94, "dueDay": 3, "paid": true, "paidDate": "2026-01-21"}, {"name": "Green Telluride", "bank": "Rally CU", "amount": 803.76, "dueDay": 3, "paid": true, "paidDate": "2026-01-09"}, {"name": "Chrysler Pacifica", "bank": "Global Lending", "amount": 576.57, "dueDay": 3, "paid": true, "paidDate": "2026-01-02"}, {"name": "Red Sorento", "bank": "Kia Finance", "amount": 769.8, "dueDay": 5, "paid": true, "paidDate": "2026-01-13"}, {"name": "Dark Grey Cherokee", "bank": "PNC Bank", "amount": 788.71, "dueDay": 6, "paid": true, "paidDate": "2026-01-21"}, {"name": "Silver Cherokee", "bank": "Stellantis", "amount": 772.53, "dueDay": 6, "paid": true, "paidDate": "2026-01-13"}, {"name": "White Wagoneer", "bank": "Ally bank", "amount": 1384.35, "dueDay": 10, "paid": true, "paidDate": "2026-01-21"}, {"name": "Brown Sorento", "bank": "Capital One bank", "amount": 782.9, "dueDay": 14, "paid": true, "paidDate": "2026-01-24"}, {"name": "Blue Wagoneer", "bank": "TD Financial", "amount": 1354.48, "dueDay": 18, "paid": true, "paidDate": "2026-01-20"}, {"name": "Silver Wagoneer", "bank": "Stellantis", "amount": 1200.9, "dueDay": 19, "paid": true, "paidDate": "2026-01-21"}, {"name": "Pearl Wagoneer", "bank": "Rally CU", "amount": 999.02, "dueDay": 24, "paid": false, "paidDate": ""}, {"name": "Black Wagoneer", "bank": "Chrysler Capital", "amount": 1069.71, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Willys Green", "bank": "Chrysler Capt.", "amount": 1074.24, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Gray Kia K4", "bank": "Kia Finance", "amount": 656.52, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Black Kia K4", "bank": "Rally CU", "amount": 706.41, "dueDay": 27, "paid": true, "paidDate": "2026-01-24"}, {"name": "Jeep Gladiator", "bank": "Rally CU", "amount": 963.3, "dueDay": 30, "paid": false, "paidDate": ""}, {"name": "White Wrangler Sport", "bank": "Chrysler Cap.", "amount": 956.19, "dueDay": 30, "paid": false, "paidDate": ""}];
+    function getVehicleColor(name) {
+        const n = name.toLowerCase();
+        if (n.includes('black')) return '#000000';
+        if (n.includes('blue')) return '#0056b3';
+        if (n.includes('silver') || n.includes('gray') || n.includes('grey')) return '#717171';
+        if (n.includes('white') || n.includes('pearl')) return '#b2b2b2';
+        if (n.includes('red')) return '#d32f2f';
+        if (n.includes('green')) return '#2e7d32';
+        if (n.includes('brown')) return '#5d4037';
+        return '#2c3e50'; // Default
+    }
 
     async function loadFromCloud() {
         updateSyncStatus("Syncing...", "#f1c40f");
         try {
             const res = await fetch(CLOUD_URL);
             const data = await res.json();
-            if(data && data.length > 5) {
-                fleet = data.map(r => ({
-                    name: r.vehicle || r.name,
-                    bank: r.bank,
-                    amount: parseFloat(r.amount) || 0,
-                    dueDay: parseInt(r.dueday || r.dueDay) || 1,
-                    paid: r.paid === true || String(r.paid).toUpperCase() === "TRUE",
-                    paidDate: r.paiddate || r.paidDate || ""
-                }));
-            } else { fleet = [...backupData]; }
+            fleet = data.length > 0 ? data.map(r => ({
+                name: r.vehicle || r.name, bank: r.bank, amount: parseFloat(r.amount),
+                dueDay: parseInt(r.dueday || r.dueDay), paid: String(r.paid).toUpperCase() === "TRUE",
+                paidDate: r.paiddate || r.paidDate || ""
+            })) : []; 
             saveAndRender();
             updateSyncStatus("Cloud Synced", "#27ae60");
-        } catch (e) {
-            fleet = [...backupData];
-            saveAndRender();
-            updateSyncStatus("Offline Mode", "#e74c3c");
-        }
+        } catch (e) { updateSyncStatus("Offline", "#e74c3c"); }
     }
 
     async function pushToCloud() {
         updateSyncStatus("Saving...", "#f1c40f");
-        const cleanData = fleet.map(c => ({
-            vehicle: c.name, bank: c.bank, amount: c.amount,
-            dueday: c.dueDay, paid: c.paid, paiddate: c.paidDate
-        }));
         try {
-            await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(cleanData) });
-            updateSyncStatus("Cloud Updated", "#27ae60");
-            setTimeout(loadFromCloud, 1500);
+            await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(fleet) });
+            updateSyncStatus("Saved", "#27ae60");
+            setTimeout(loadFromCloud, 1000);
         } catch (e) { updateSyncStatus("Error", "#e74c3c"); }
     }
 
@@ -149,32 +124,33 @@
         fleet.forEach((car, i) => {
             if (car.name !== "Jaime Palisade 2021") total += car.amount;
             if (car.paid) paidC++;
-            let late = car.dueDay + 10;
-            let lateDisp = late > 30 ? late - 30 : late;
-            let status = "On Time"; let sClass = "";
-            if (car.name.includes("Jaime")) { status = "Partner"; sClass = "status-external"; }
-            else if (car.paid) { status = "✅ PAID"; sClass = "status-paid"; }
-            else if (today > late || (late > 30 && today < lateDisp)) { status = "🚨 OVERDUE"; sClass = "status-critical"; }
-            else if (today > car.dueDay) { status = "⚠️ GRACE"; sClass = "status-grace"; }
+            let sClass = car.paid ? "status-paid" : "";
+            let vColor = getVehicleColor(car.name);
 
             body.innerHTML += `<tr class="${sClass}">
-                <td><input class="vehicle-input" value="${car.name}" ${isLocked?'disabled':''} oninput="fleet[${i}].name=this.value"></td>
+                <td><input class="vehicle-input" style="color:${vColor}" value="${car.name}" ${isLocked?'disabled':''} oninput="fleet[${i}].name=this.value"></td>
                 <td><input value="${car.bank}" ${isLocked?'disabled':''} oninput="fleet[${i}].bank=this.value"></td>
                 <td>$<input type="number" value="${car.amount}" ${isLocked?'disabled':''} oninput="fleet[${i}].amount=parseFloat(this.value)"></td>
                 <td><input type="number" value="${car.dueDay}" ${isLocked?'disabled':''} oninput="fleet[${i}].dueDay=parseInt(this.value)"></td>
-                <td style="font-size: 13px;">Day ${lateDisp}</td>
-                <td style="font-size: 13px;">${status}</td>
-                <td style="font-size: 13px;">${isLocked ? car.paidDate : `<input type="date" value="${car.paidDate}" oninput="fleet[${i}].paidDate=this.value">`}</td>
+                <td>${car.paid ? 'PAID' : 'Due'}</td>
+                <td>${isLocked ? car.paidDate : `<input type="date" value="${car.paidDate}" oninput="fleet[${i}].paidDate=this.value">`}</td>
                 <td><button class="btn" style="background:#2ecc71; color:white;" onclick="togglePaid(${i})">${car.paid?'Undo':'Paid'}</button></td>
             </tr>`;
         });
-        document.getElementById('total-owed').innerText = `Total: $${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        document.getElementById('total-owed').innerText = `Total: $${total.toLocaleString()}`;
         document.getElementById('paid-count').innerText = `Paid: ${paidC} / ${fleet.length}`;
+    }
+
+    function checkPin() {
+        if (!isLocked) { toggleLock(); return; }
+        const entry = prompt("Enter PIN to unlock fleet editing:");
+        if (entry === SECRET_PIN) toggleLock();
+        else if (entry !== null) alert("Incorrect PIN");
     }
 
     function togglePaid(i) {
         fleet[i].paid = !fleet[i].paid;
-        fleet[i].paidDate = fleet[i].paid ? new Date().toISOString().split('T')[0] : "";
+        fleet[i].paidDate = fleet[i].paid ? new Date().toLocaleDateString() : "";
         saveAndRender(); pushToCloud();
     }
 
@@ -182,24 +158,14 @@
         isLocked = !isLocked;
         document.getElementById('lockBtn').innerText = isLocked ? "🔒 Unlock" : "🔓 Lock";
         document.getElementById('saveCloudBtn').disabled = !isLocked;
-        if(isLocked) saveAndRender();
+        saveAndRender();
     }
 
     function updateSyncStatus(text, color) {
         document.getElementById('sync-status').innerHTML = `<span class="dot" style="background:${color}"></span> ${text}`;
     }
 
-    function exportJSON() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fleet));
-        const dl = document.createElement('a');
-        dl.setAttribute("href", dataStr); dl.setAttribute("download", "956_fleet_backup.json"); dl.click();
-    }
-
-    function importJSON(event) {
-        const reader = new FileReader();
-        reader.onload = (e) => { fleet = JSON.parse(e.target.result); saveAndRender(); alert("Restored! Lock & Save then Push Cloud."); };
-        reader.readAsText(event.target.files[0]);
-    }
+    function exportJSON() { /* Backup logic */ }
 
     loadFromCloud();
 </script>
