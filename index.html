@@ -18,7 +18,6 @@
         .status-paid { background: #e8f5e9; color: #2e7d32; opacity: 0.8; }
         .status-external { background: #f1f2f6; color: #7f8c8d; font-style: italic; }
         .btn { cursor: pointer; border-radius: 6px; padding: 10px 15px; border: none; font-weight: bold; transition: 0.2s; }
-        .btn:hover { opacity: 0.8; }
         #sync-status { font-weight: bold; font-size: 0.9em; display: flex; align-items: center; gap: 5px; }
         .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
     </style>
@@ -29,7 +28,7 @@
     <div class="flex-header">
         <div>
             <h1>956 Rideco Cloud Commander</h1>
-            <div id="sync-status">Connecting...</div>
+            <div id="sync-status"><span class="dot" style="background:#f1c40f"></span> Connecting...</div>
         </div>
         <div style="text-align: right;">
             <h3 id="total-owed" style="margin:0;">Total: $0.00</h3>
@@ -58,12 +57,12 @@
 </div>
 
 <script>
-    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbx3FUfnLUyiyWCPLCDxiRKd42_8K6AMj4CsHL7MRIovwX2OvPx1hLOICaNY41BxaNgvFw/exec";
+    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzs3Y76VOyP3Vlj7Ka_IVt6-ycs9Yj91kTNRplMM1tjq0gBsynyZiVUjNT6pMbGyamq/exec";
     
     let isLocked = true;
     let fleet = [];
+    const today = new Date().getDate();
 
-    // LATEST BACKUP DATA EMBEDDED
     const backupData = [{"name": "Jaime Palisade 2021", "bank": "Partner Managed", "amount": 0, "dueDay": 1, "paid": true, "paidDate": "N/A"}, {"name": "Black Palisade XRT", "bank": "Hyundai Finance", "amount": 945.83, "dueDay": 1, "paid": true, "paidDate": "2026-01-08"}, {"name": "Blue Jeep Compass", "bank": "exeter Fin.", "amount": 725.53, "dueDay": 1, "paid": true, "paidDate": "2026-01-01"}, {"name": "Silver Voyager", "bank": "Chase Bank", "amount": 841.24, "dueDay": 1, "paid": true, "paidDate": "2026-01-12"}, {"name": "White Voyager", "bank": "Ally Bank", "amount": 877.62, "dueDay": 2, "paid": true, "paidDate": "2026-01-09"}, {"name": "Grey Palisade", "bank": "TD bank", "amount": 865.34, "dueDay": 2, "paid": true, "paidDate": "2026-01-09"}, {"name": "Blue Telluride", "bank": "SFCU", "amount": 773.94, "dueDay": 3, "paid": true, "paidDate": "2026-01-21"}, {"name": "Green Telluride", "bank": "Rally CU", "amount": 803.76, "dueDay": 3, "paid": true, "paidDate": "2026-01-09"}, {"name": "Chrysler Pacifica", "bank": "Global Lending", "amount": 576.57, "dueDay": 3, "paid": true, "paidDate": "2026-01-02"}, {"name": "Red Sorento", "bank": "Kia Finance", "amount": 769.8, "dueDay": 5, "paid": true, "paidDate": "2026-01-13"}, {"name": "Dark Grey Cherokee", "bank": "PNC Bank", "amount": 788.71, "dueDay": 6, "paid": true, "paidDate": "2026-01-21"}, {"name": "Silver Cherokee", "bank": "Stellantis", "amount": 772.53, "dueDay": 6, "paid": true, "paidDate": "2026-01-13"}, {"name": "White Wagoneer", "bank": "Ally bank", "amount": 1384.35, "dueDay": 10, "paid": true, "paidDate": "2026-01-21"}, {"name": "Brown Sorento", "bank": "Capital One bank", "amount": 782.9, "dueDay": 14, "paid": true, "paidDate": "2026-01-24"}, {"name": "Blue Wagoneer", "bank": "TD Financial", "amount": 1354.48, "dueDay": 18, "paid": true, "paidDate": "2026-01-20"}, {"name": "Silver Wagoneer", "bank": "Stellantis", "amount": 1200.9, "dueDay": 19, "paid": true, "paidDate": "2026-01-21"}, {"name": "Pearl Wagoneer", "bank": "Rally CU", "amount": 999.02, "dueDay": 24, "paid": false, "paidDate": ""}, {"name": "Black Wagoneer", "bank": "Chrysler Capital", "amount": 1069.71, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Willys Green", "bank": "Chrysler Capt.", "amount": 1074.24, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Gray Kia K4", "bank": "Kia Finance", "amount": 656.52, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Black Kia K4", "bank": "Rally CU", "amount": 706.41, "dueDay": 27, "paid": true, "paidDate": "2026-01-24"}, {"name": "Jeep Gladiator", "bank": "Rally CU", "amount": 963.3, "dueDay": 30, "paid": false, "paidDate": ""}, {"name": "White Wrangler Sport", "bank": "Chrysler Cap.", "amount": 956.19, "dueDay": 30, "paid": false, "paidDate": ""}];
 
     async function loadFromCloud() {
@@ -73,12 +72,12 @@
             const data = await res.json();
             if(data && data.length > 5) {
                 fleet = data.map(r => ({
-                    name: r.vehicle || "Unknown",
-                    bank: r.bank || "Unknown",
+                    name: r.vehicle || r.name,
+                    bank: r.bank,
                     amount: parseFloat(r.amount) || 0,
-                    dueDay: parseInt(r.dueday) || 1,
-                    paid: String(r.paid).toUpperCase() === "TRUE",
-                    paidDate: r.paiddate || ""
+                    dueDay: parseInt(r.dueday || r.dueDay) || 1,
+                    paid: r.paid === true || String(r.paid).toUpperCase() === "TRUE",
+                    paidDate: r.paiddate || r.paidDate || ""
                 }));
             } else { fleet = [...backupData]; }
             saveAndRender();
@@ -86,7 +85,7 @@
         } catch (e) {
             fleet = [...backupData];
             saveAndRender();
-            updateSyncStatus("Local Mode (Cloud Error)", "#e74c3c");
+            updateSyncStatus("Local Mode", "#e74c3c");
         }
     }
 
@@ -99,25 +98,21 @@
         try {
             await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(cleanData) });
             updateSyncStatus("Cloud Updated", "#27ae60");
-        } catch (e) {
-            updateSyncStatus("Save Failed", "#e74c3c");
-        }
+            setTimeout(loadFromCloud, 1500);
+        } catch (e) { updateSyncStatus("Save Failed", "#e74c3c"); }
     }
 
     function saveAndRender() {
         fleet.sort((a, b) => a.dueDay - b.dueDay);
         const body = document.getElementById('tableBody');
         body.innerHTML = '';
-        const today = new Date().getDate();
         let total = 0; let paidC = 0;
-
         fleet.forEach((car, i) => {
             if (car.name !== "Jaime Palisade 2021") total += car.amount;
             if (car.paid) paidC++;
             let late = car.dueDay + 10;
             let lateDisp = late > 30 ? late - 30 : late;
             let status = "On Time"; let sClass = "";
-
             if (car.name.includes("Jaime")) { status = "Partner"; sClass = "status-external"; }
             else if (car.paid) { status = "✅ PAID"; sClass = "status-paid"; }
             else if (today > late || (late > 30 && today < lateDisp)) { status = "🚨 OVERDUE"; sClass = "status-critical"; }
@@ -147,7 +142,6 @@
     function toggleLock() {
         isLocked = !isLocked;
         document.getElementById('lockBtn').innerText = isLocked ? "🔒 Unlock to Edit" : "🔓 Lock & Save";
-        document.getElementById('lockBtn').style.background = isLocked ? "#34495e" : "#e67e22";
         document.getElementById('saveCloudBtn').disabled = !isLocked;
         if(isLocked) saveAndRender();
     }
@@ -159,22 +153,12 @@
     function exportJSON() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fleet));
         const dl = document.createElement('a');
-        dl.setAttribute("href", dataStr);
-        dl.setAttribute("download", "956_rideco_backup.json");
-        dl.click();
+        dl.setAttribute("href", dataStr); dl.setAttribute("download", "956_fleet_backup.json"); dl.click();
     }
 
     function importJSON(event) {
         const reader = new FileReader();
-        reader.onload = (e) => { 
-            const imported = JSON.parse(e.target.result);
-            fleet = imported.map(c => ({
-                name: c.name || c.vehicle, bank: c.bank, amount: c.amount,
-                dueDay: c.dueDay || c.dueday, paid: c.paid, paidDate: c.paidDate || c.paiddate
-            }));
-            saveAndRender();
-            alert("File Restored! Click 'Lock & Save' and then 'Save to Cloud' to update the team.");
-        };
+        reader.onload = (e) => { fleet = JSON.parse(e.target.result); saveAndRender(); alert("Restored! Lock & Save then Push to Cloud."); };
         reader.readAsText(event.target.files[0]);
     }
 
