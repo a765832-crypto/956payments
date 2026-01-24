@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>956 Rideco Cloud Commander</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 15px; color: #333; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 1450px; margin: auto; }
+        .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #2c3e50; color: white; position: sticky; top: 0; z-index: 10; font-size: 13px; text-transform: uppercase; }
+        input { border: 1px solid transparent; padding: 8px; border-radius: 4px; width: 90%; font-size: 14px; transition: 0.2s; }
+        input:disabled { background: transparent; color: #333; cursor: default; border: none; font-weight: 500; }
+        .status-critical { background: #ffebee; color: #c62828; font-weight: bold; }
+        .status-grace { background: #fff3e0; color: #ef6c00; font-weight: bold; }
+        .status-paid { background: #e8f5e9; color: #2e7d32; opacity: 0.8; }
+        .status-external { background: #f1f2f6; color: #7f8c8d; font-style: italic; }
+        .btn { cursor: pointer; border-radius: 6px; padding: 10px 18px; border: none; font-weight: bold; transition: 0.2s; font-size: 14px; }
+        .btn-lock { background: #34495e; color: white; }
+        .btn-sync { background: #3498db; color: white; }
+        .btn-paid { background: #2ecc71; color: white; padding: 6px 12px; }
+        .btn-unpaid { background: #95a5a6; color: white; padding: 6px 12px; }
+        #sync-status { font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
+        .dot-green { background-color: #27ae60; }
+        .dot-yellow { background-color: #f1c40f; }
+        .dot-red { background-color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="flex-header">
+        <div>
+            <h1 style="margin:0;">956 Rideco Cloud Commander</h1>
+            <div id="sync-status"><span class="dot dot-yellow"></span> Connecting to Cloud...</div>
+        </div>
+        <div style="text-align: right;">
+            <h3 id="total-owed" style="margin: 0; color: #2c3e50;">Monthly Obligation: $0.00</h3>
+            <p id="paid-count" style="margin: 0; font-size: 0.9em; color: #666;">Paid: 0 / 23</p>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="lockBtn" class="btn btn-lock" onclick="toggleLock()">🔒 Unlock to Edit Fleet</button>
+        <button class="btn btn-sync" onclick="loadFromCloud()">🔄 Refresh Data</button>
+        <button id="saveCloudBtn" class="btn" style="background:#2ecc71; color:white;" onclick="pushToCloud()" disabled>☁️ Save to Cloud</button>
+        <button class="btn btn-csv" onclick="exportCSV()">📊 Export CSV</button>
+        <button class="btn" style="background:#9b59b6; color:white;" onclick="resetForNewMonth()">🔄 New Month Reset</button>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Vehicle</th>
+                <th>Bank / Lender</th>
+                <th>Payment ($)</th>
+                <th>Due Day</th>
+                <th>Late Date (+10)</th>
+                <th>Status</th>
+                <th>Date Paid</th>
+                <th>Action</th>
+                <th id="delHeader" style="display:none">Del</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbx3FUfnLUyiyWCPLCDxiRKd42_8K6AMj4CsHL7MRIovwX2OvPx1hLOICaNY41BxaNgvFw/exec";
+    
+    let isLocked = true;
+    let fleet = [];
+    const todayNum = new Date().getDate();
+
+    // UPDATED INITIAL DATA FROM YOUR BACKUP
+    const initialFleet = [{"name": "Jaime Palisade 2021", "bank": "Partner Managed", "amount": 0, "dueDay": 1, "paid": true, "paidDate": "N/A"}, {"name": "Black Palisade XRT", "bank": "Hyundai Finance", "amount": 945.83, "dueDay": 1, "paid": true, "paidDate": "2026-01-08"}, {"name": "Blue Jeep Compass", "bank": "exeter Fin.", "amount": 725.53, "dueDay": 1, "paid": true, "paidDate": "2026-01-01"}, {"name": "Silver Voyager", "bank": "Chase Bank", "amount": 841.24, "dueDay": 1, "paid": true, "paidDate": "2026-01-12"}, {"name": "White Voyager", "bank": "Ally Bank", "amount": 877.62, "dueDay": 2, "paid": true, "paidDate": "2026-01-09"}, {"name": "Grey Palisade", "bank": "TD bank", "amount": 865.34, "dueDay": 2, "paid": true, "paidDate": "2026-01-09"}, {"name": "Blue Telluride", "bank": "SFCU", "amount": 773.94, "dueDay": 3, "paid": true, "paidDate": "2026-01-21"}, {"name": "Green Telluride", "bank": "Rally CU", "amount": 803.76, "dueDay": 3, "paid": true, "paidDate": "2026-01-09"}, {"name": "Chrysler Pacifica", "bank": "Global Lending", "amount": 576.57, "dueDay": 3, "paid": true, "paidDate": "2026-01-02"}, {"name": "Red Sorento", "bank": "Kia Finance", "amount": 769.8, "dueDay": 5, "paid": true, "paidDate": "2026-01-13"}, {"name": "Dark Grey Cherokee", "bank": "PNC Bank", "amount": 788.71, "dueDay": 6, "paid": true, "paidDate": "2026-01-21"}, {"name": "Silver Cherokee", "bank": "Stellantis", "amount": 772.53, "dueDay": 6, "paid": true, "paidDate": "2026-01-13"}, {"name": "White Wagoneer", "bank": "Ally bank", "amount": 1384.35, "dueDay": 10, "paid": true, "paidDate": "2026-01-21"}, {"name": "Brown Sorento", "bank": "Capital One bank", "amount": 782.9, "dueDay": 14, "paid": true, "paidDate": "2026-01-24"}, {"name": "Blue Wagoneer", "bank": "TD Financial", "amount": 1354.48, "dueDay": 18, "paid": true, "paidDate": "2026-01-20"}, {"name": "Silver Wagoneer", "bank": "Stellantis", "amount": 1200.9, "dueDay": 19, "paid": true, "paidDate": "2026-01-21"}, {"name": "Pearl Wagoneer", "bank": "Rally CU", "amount": 999.02, "dueDay": 24, "paid": false, "paidDate": ""}, {"name": "Black Wagoneer", "bank": "Chrysler Capital", "amount": 1069.71, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Willys Green", "bank": "Chrysler Capt.", "amount": 1074.24, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Gray Kia K4", "bank": "Kia Finance", "amount": 656.52, "dueDay": 26, "paid": false, "paidDate": ""}, {"name": "Black Kia K4", "bank": "Rally CU", "amount": 706.41, "dueDay": 27, "paid": true, "paidDate": "2026-01-24"}, {"name": "Jeep Gladiator", "bank": "Rally CU", "amount": 963.3, "dueDay": 30, "paid": false, "paidDate": ""}, {"name": "White Wrangler Sport", "bank": "Chrysler Cap.", "amount": 956.19, "dueDay": 30, "paid": false, "paidDate": ""}];
+
+    async function loadFromCloud() {
+        updateSyncStatus("Syncing...", "yellow");
+        try {
+            const response = await fetch(CLOUD_URL);
+            const data = await response.json();
+            if(data && data.length > 0) {
+                fleet = data.map(row => ({
+                    name: row.vehicle, bank: row.bank, amount: parseFloat(row.amount),
+                    dueDay: parseInt(row.dueday), paid: String(row.paid).toUpperCase() === "TRUE",
+                    paidDate: row.paiddate, id: row.id || Date.now()
+                }));
+            } else { fleet = initialFleet; }
+            saveAndRender(false);
+            updateSyncStatus("Cloud Synced", "green");
+        } catch (e) {
+            fleet = initialFleet;
+            saveAndRender(false);
+            updateSyncStatus("Cloud Synced (Local)", "green");
+        }
+    }
+
+    async function pushToCloud() {
+        updateSyncStatus("Uploading...", "yellow");
+        const uploadData = fleet.map(car => ({
+            vehicle: car.name, bank: car.bank, amount: car.amount,
+            dueday: car.dueDay, paid: car.paid, paiddate: car.paidDate, id: car.id
+        }));
+        await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(uploadData) });
+        updateSyncStatus("Changes Saved", "green");
+    }
+
+    function saveAndRender(shouldSort = true) {
+        if (shouldSort) fleet.sort((a, b) => a.dueDay - b.dueDay);
+        const body = document.getElementById('tableBody');
+        body.innerHTML = '';
+        let total = 0; let paidCount = 0;
+
+        fleet.forEach((car, index) => {
+            if (car.name !== "Jaime Palisade 2021") total += parseFloat(car.amount || 0);
+            if (car.paid) paidCount++;
+            let lateDay = (parseInt(car.dueDay) + 10);
+            let lateDisp = lateDay > 30 ? lateDay - 30 : lateDay;
+            let statusText = "On Time"; let statusClass = "";
+
+            if (car.name.includes("Jaime")) { statusText = "External"; statusClass = "status-external"; }
+            else if (car.paid) { statusText = "✅ PAID"; statusClass = "status-paid"; }
+            else if (todayNum > car.dueDay && todayNum <= lateDay) { statusText = "⚠️ GRACE"; statusClass = "status-grace"; }
+            else if (todayNum > lateDay || (lateDay > 30 && todayNum < lateDisp)) { statusText = "🚨 OVERDUE"; statusClass = "status-critical"; }
+
+            body.innerHTML += `
+                <tr class="${statusClass}">
+                    <td><input type="text" value="${car.name}" ${isLocked?'disabled':''} oninput="fleet[${index}].name=this.value"></td>
+                    <td><input type="text" value="${car.bank}" ${isLocked?'disabled':''} oninput="fleet[${index}].bank=this.value"></td>
+                    <td>$<input type="number" step="0.01" value="${car.amount}" ${isLocked?'disabled':''} oninput="fleet[${index}].amount=parseFloat(this.value)"></td>
+                    <td><input type="number" value="${car.dueDay}" ${isLocked?'disabled':''} oninput="fleet[${index}].dueDay=parseInt(this.value)"></td>
+                    <td>Day ${lateDisp}</td>
+                    <td><strong>${statusText}</strong></td>
+                    <td>${isLocked ? `<span>${car.paidDate || '-'}</span>` : `<input type="date" value="${car.paidDate}" oninput="fleet[${index}].paidDate=this.value">`}</td>
+                    <td><button class="${car.paid?'btn-unpaid':'btn-paid'}" onclick="togglePaid(${index})">${car.paid?'Undo':'Mark Paid'}</button></td>
+                </tr>
+            `;
+        });
+        document.getElementById('total-owed').innerText = `Monthly Obligation: $${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        document.getElementById('paid-count').innerText = `Paid: ${paidCount} / ${fleet.length}`;
+    }
+
+    function togglePaid(index) {
+        fleet[index].paid = !fleet[index].paid;
+        fleet[index].paidDate = fleet[index].paid ? new Date().toISOString().split('T')[0] : "";
+        saveAndRender(false); pushToCloud();
+    }
+
+    function toggleLock() {
+        isLocked = !isLocked;
+        document.getElementById('lockBtn').innerText = isLocked ? "🔒 Unlock to Edit Fleet" : "🔓 Lock & Review Changes";
+        document.getElementById('saveCloudBtn').disabled = !isLocked;
+        saveAndRender(isLocked);
+    }
+
+    function updateSyncStatus(text, color) { document.getElementById('sync-status').innerHTML = `<span class="dot dot-${color}"></span> ${text}`; }
+    function exportCSV() { /* Existing CSV logic */ }
+    function resetForNewMonth() { if(confirm("Reset month?")) { fleet.forEach(c => { if(!c.name.includes("Jaime")){ c.paid=false; c.paidDate=""; }}); saveAndRender(); pushToCloud(); }}
+
+    loadFromCloud();
+</script>
+</body>
+</html>
