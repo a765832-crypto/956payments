@@ -7,26 +7,28 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 10px; color: #333; margin: 0; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 1450px; margin: auto; }
-        .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
         
+        /* Search Bar Styling */
+        .search-box { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; font-size: 16px; box-sizing: border-box; }
+        .search-box:focus { border-color: #3498db; outline: none; }
+
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
-        .btn { cursor: pointer; border-radius: 8px; padding: 12px; border: none; font-weight: bold; font-size: 14px; text-align: center; transition: 0.2s; }
-        .btn:active { transform: scale(0.98); }
+        .btn { cursor: pointer; border-radius: 8px; padding: 12px; border: none; font-weight: bold; font-size: 14px; text-align: center; }
         
-        .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; border-radius: 8px; }
+        .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; min-width: 950px; }
         th, td { padding: 15px 10px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; }
         
         .vehicle-name { font-weight: 800; font-size: 18px; text-transform: uppercase; line-height: 1.1; }
-        .paid-date-text { font-weight: 700; font-size: 17px; color: #2c3e50; }
+        .paid-date-text { font-weight: 700; font-size: 17px; color: #2c3e50; white-space: nowrap; }
 
         input { border: 1px solid transparent; padding: 8px; width: 95%; font-size: 15px; background: transparent; }
-        input:focus { background: #f9f9f9; border-bottom: 2px solid #3498db; outline: none; }
         input:disabled { opacity: 1; -webkit-text-fill-color: inherit; color: inherit; }
 
         .status-paid { background: #e8f5e9; }
-        .btn-delete { background: #ff4757; color: white; padding: 5px 10px; font-size: 12px; border-radius: 4px; }
+        .btn-delete { background: #ff4757; color: white; padding: 5px 10px; border-radius: 4px; }
         #sync-status { font-weight: bold; font-size: 0.85em; display: flex; align-items: center; gap: 5px; margin-bottom: 10px; }
         .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
     </style>
@@ -44,6 +46,8 @@
             <p id="paid-count" style="margin:0; font-size: 0.9rem;">Paid: 0 / 0</p>
         </div>
     </div>
+
+    <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search Vehicle or Bank..." onkeyup="saveAndRender()">
 
     <div class="controls">
         <button id="lockBtn" class="btn" style="background:#34495e; color:white;" onclick="checkPin()">🔒 Unlock</button>
@@ -92,16 +96,34 @@
         return '#2c3e50';
     }
 
+    // NEW: Function to clean date strings and remove time
+    function formatDateClean(dateStr) {
+        if (!dateStr || dateStr === "N/A" || dateStr === "") return "-";
+        try {
+            const date = new Date(dateStr);
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                 // Fallback for string-based cleaning
+                 let parts = dateStr.split(/[T\s]/)[0].split(/[-/]/);
+                 if (parts.length === 3) return `${parts[1]}/${parts[2]}/${parts[0]}`;
+                 return dateStr;
+            }
+            return (date.getMonth() + 1).toString().padStart(2, '0') + '/' + 
+                   date.getDate().toString().padStart(2, '0') + '/' + 
+                   date.getFullYear();
+        } catch (e) { return dateStr; }
+    }
+
     async function loadFromCloud() {
         updateSyncStatus("Syncing...", "#f1c40f");
         try {
             const res = await fetch(CLOUD_URL);
             const data = await res.json();
-            fleet = data.length > 0 ? data.map(r => ({
+            fleet = data.map(r => ({
                 name: r.vehicle || r.name || "New Car", bank: r.bank || "", amount: parseFloat(r.amount) || 0,
                 dueDay: parseInt(r.dueday || r.dueDay) || 1, paid: String(r.paid).toUpperCase() === "TRUE",
                 paidDate: r.paiddate || r.paidDate || ""
-            })) : []; 
+            }));
             saveAndRender();
             updateSyncStatus("Cloud Synced", "#27ae60");
         } catch (e) { updateSyncStatus("Offline", "#e74c3c"); }
@@ -118,37 +140,34 @@
 
     function saveAndRender() {
         if (isLocked) fleet.sort((a, b) => a.dueDay - b.dueDay);
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const body = document.getElementById('tableBody');
         body.innerHTML = '';
         let total = 0; let paidC = 0;
         
         fleet.forEach((car, i) => {
-            if (car.name !== "Jaime Palisade 2021") total += car.amount;
-            if (car.paid) paidC++;
-            let sClass = car.paid ? "status-paid" : "";
-            let vColor = getVehicleColor(car.name);
+            if (car.name.toLowerCase().includes(searchTerm) || car.bank.toLowerCase().includes(searchTerm)) {
+                if (car.name !== "Jaime Palisade 2021") total += car.amount;
+                if (car.paid) paidC++;
+                let sClass = car.paid ? "status-paid" : "";
+                let vColor = getVehicleColor(car.name);
 
-            let dateDisplay = car.paidDate;
-            if (dateDisplay && dateDisplay !== "N/A" && dateDisplay.includes('-')) {
-                const parts = dateDisplay.split('-');
-                dateDisplay = `${parts[1]}/${parts[2]}/${parts[0]}`;
+                body.innerHTML += `<tr class="${sClass}">
+                    <td class="vehicle-name" style="color:${vColor}">
+                        ${isLocked ? car.name : `<input value="${car.name}" oninput="fleet[${i}].name=this.value">`}
+                    </td>
+                    <td><input value="${car.bank}" ${isLocked?'disabled':''} oninput="fleet[${i}].bank=this.value"></td>
+                    <td>$<input type="number" value="${car.amount}" ${isLocked?'disabled':''} oninput="fleet[${i}].amount=parseFloat(this.value)"></td>
+                    <td><input type="number" value="${car.dueDay}" ${isLocked?'disabled':''} oninput="fleet[${i}].dueDay=parseInt(this.value)"></td>
+                    <td>
+                        ${isLocked ? `<span class="paid-date-text">${formatDateClean(car.paidDate)}</span>` : `<input type="date" value="${car.paidDate.split('T')[0]}" oninput="fleet[${i}].paidDate=this.value">`}
+                    </td>
+                    <td><button class="btn" style="background:#2ecc71; color:white; width: 100%;" onclick="togglePaid(${i})">${car.paid?'Undo':'Paid'}</button></td>
+                    <td style="display:${isLocked ? 'none' : 'table-cell'}">
+                        <button class="btn-delete" onclick="removeVehicle(${i})">X</button>
+                    </td>
+                </tr>`;
             }
-
-            body.innerHTML += `<tr class="${sClass}">
-                <td class="vehicle-name" style="color:${vColor}">
-                    ${isLocked ? car.name : `<input value="${car.name}" oninput="fleet[${i}].name=this.value">`}
-                </td>
-                <td><input value="${car.bank}" ${isLocked?'disabled':''} oninput="fleet[${i}].bank=this.value"></td>
-                <td>$<input type="number" value="${car.amount}" ${isLocked?'disabled':''} oninput="fleet[${i}].amount=parseFloat(this.value)"></td>
-                <td><input type="number" value="${car.dueDay}" ${isLocked?'disabled':''} oninput="fleet[${i}].dueDay=parseInt(this.value)"></td>
-                <td>
-                    ${isLocked ? `<span class="paid-date-text">${dateDisplay || '-'}</span>` : `<input type="date" value="${car.paidDate}" oninput="fleet[${i}].paidDate=this.value">`}
-                </td>
-                <td><button class="btn" style="background:#2ecc71; color:white; width: 100%;" onclick="togglePaid(${i})">${car.paid?'Undo':'Paid'}</button></td>
-                <td style="display:${isLocked ? 'none' : 'table-cell'}">
-                    <button class="btn-delete" onclick="removeVehicle(${i})">X</button>
-                </td>
-            </tr>`;
         });
         document.getElementById('total-owed').innerText = `Total: $${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
         document.getElementById('paid-count').innerText = `Paid: ${paidC} / ${fleet.length}`;
@@ -164,7 +183,7 @@
 
     function togglePaid(i) {
         fleet[i].paid = !fleet[i].paid;
-        fleet[i].paidDate = fleet[i].paid ? new Date().toISOString().split('T')[0] : "";
+        fleet[i].paidDate = fleet[i].paid ? new Date().toISOString() : "";
         saveAndRender(); 
         pushToCloud();
     }
@@ -178,12 +197,12 @@
     }
 
     function addNewVehicle() {
-        fleet.push({ name: "NEW BLACK JEEP", bank: "BANK", amount: 0, dueDay: 1, paid: false, paidDate: "" });
+        fleet.push({ name: "NEW CAR", bank: "BANK", amount: 0, dueDay: 1, paid: false, paidDate: "" });
         saveAndRender();
     }
 
     function removeVehicle(i) {
-        if(confirm(`Remove ${fleet[i].name} from the fleet?`)) {
+        if(confirm(`Remove this vehicle?`)) {
             fleet.splice(i, 1);
             saveAndRender();
         }
@@ -195,7 +214,7 @@
 
     function importJSON(event) {
         const reader = new FileReader();
-        reader.onload = (e) => { fleet = JSON.parse(e.target.result); saveAndRender(); alert("Restored! Unlock then Save Cloud."); };
+        reader.onload = (e) => { fleet = JSON.parse(e.target.result); saveAndRender(); };
         reader.readAsText(event.target.files[0]);
     }
 
