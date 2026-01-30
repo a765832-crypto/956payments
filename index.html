@@ -7,12 +7,15 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 10px; color: #333; margin: 0; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 1450px; margin: auto; }
-        .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
+        .flex-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
         
-        /* Search Bar Styling */
-        .search-box { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; font-size: 16px; box-sizing: border-box; }
-        .search-box:focus { border-color: #3498db; outline: none; }
+        /* Stats Styling */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: right; }
+        .stat-box { background: #f8f9fa; padding: 8px 12px; border-radius: 8px; border: 1px solid #eee; }
+        .stat-label { font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; }
+        .stat-value { font-size: 16px; font-weight: 800; }
 
+        .search-box { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; font-size: 16px; box-sizing: border-box; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
         .btn { cursor: pointer; border-radius: 8px; padding: 12px; border: none; font-weight: bold; font-size: 14px; text-align: center; }
         
@@ -28,7 +31,6 @@
         input:disabled { opacity: 1; -webkit-text-fill-color: inherit; color: inherit; }
 
         .status-paid { background: #e8f5e9; }
-        .btn-delete { background: #ff4757; color: white; padding: 5px 10px; border-radius: 4px; }
         #sync-status { font-weight: bold; font-size: 0.85em; display: flex; align-items: center; gap: 5px; margin-bottom: 10px; }
         .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
     </style>
@@ -41,9 +43,15 @@
             <h1>956 Rideco Cloud</h1>
             <div id="sync-status"><span class="dot" style="background:#f1c40f"></span> Connecting...</div>
         </div>
-        <div style="text-align: right;">
-            <h3 id="total-owed" style="margin:0; font-size: 1.2rem;">Total: $0.00</h3>
-            <p id="paid-count" style="margin:0; font-size: 0.9rem;">Paid: 0 / 0</p>
+        <div class="stats-grid">
+            <div class="stat-box" style="border-left: 4px solid #2ecc71;">
+                <div class="stat-label">Total Paid</div>
+                <div id="total-paid" class="stat-value" style="color: #27ae60;">$0.00</div>
+            </div>
+            <div class="stat-box" style="border-left: 4px solid #e74c3c;">
+                <div class="stat-label">Remaining</div>
+                <div id="total-owed" class="stat-value" style="color: #c0392b;">$0.00</div>
+            </div>
         </div>
     </div>
 
@@ -54,7 +62,8 @@
         <button class="btn" style="background:#3498db; color:white;" onclick="loadFromCloud()">🔄 Refresh</button>
         <button id="addBtn" class="btn" style="background:#2ecc71; color:white; display:none;" onclick="addNewVehicle()">+ Add Vehicle</button>
         <button id="saveCloudBtn" class="btn" style="background:#2ecc71; color:white;" onclick="pushToCloud()" disabled>☁️ Save Cloud</button>
-        <button class="btn" style="background:#7f8c8d; color:white; grid-column: span 2;" onclick="document.getElementById('restoreFile').click()">📂 RESTORE JSON BACKUP</button>
+        <button class="btn" style="background:#f39c12; color:white; grid-column: span 1;" onclick="exportJSON()">💾 DOWNLOAD BACKUP</button>
+        <button class="btn" style="background:#7f8c8d; color:white; grid-column: span 1;" onclick="document.getElementById('restoreFile').click()">📂 RESTORE JSON</button>
         <input type="file" id="restoreFile" style="display:none" accept=".json" onchange="importJSON(event)">
     </div>
     
@@ -96,14 +105,11 @@
         return '#2c3e50';
     }
 
-    // NEW: Function to clean date strings and remove time
     function formatDateClean(dateStr) {
         if (!dateStr || dateStr === "N/A" || dateStr === "") return "-";
         try {
             const date = new Date(dateStr);
-            // Check if date is valid
             if (isNaN(date.getTime())) {
-                 // Fallback for string-based cleaning
                  let parts = dateStr.split(/[T\s]/)[0].split(/[-/]/);
                  if (parts.length === 3) return `${parts[1]}/${parts[2]}/${parts[0]}`;
                  return dateStr;
@@ -143,12 +149,22 @@
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const body = document.getElementById('tableBody');
         body.innerHTML = '';
-        let total = 0; let paidC = 0;
+        
+        let totalPaidAmt = 0;
+        let totalOwedAmt = 0;
+        let count = 0;
         
         fleet.forEach((car, i) => {
             if (car.name.toLowerCase().includes(searchTerm) || car.bank.toLowerCase().includes(searchTerm)) {
-                if (car.name !== "Jaime Palisade 2021") total += car.amount;
-                if (car.paid) paidC++;
+                const amt = parseFloat(car.amount) || 0;
+                
+                // Don't count Jaime's Palisade in financial stats
+                if (car.name !== "Jaime Palisade 2021") {
+                    if (car.paid) totalPaidAmt += amt;
+                    else totalOwedAmt += amt;
+                }
+                
+                count++;
                 let sClass = car.paid ? "status-paid" : "";
                 let vColor = getVehicleColor(car.name);
 
@@ -164,21 +180,23 @@
                     </td>
                     <td><button class="btn" style="background:#2ecc71; color:white; width: 100%;" onclick="togglePaid(${i})">${car.paid?'Undo':'Paid'}</button></td>
                     <td style="display:${isLocked ? 'none' : 'table-cell'}">
-                        <button class="btn-delete" onclick="removeVehicle(${i})">X</button>
+                        <button class="btn" style="background:#ff4757; color:white; padding:5px 10px;" onclick="removeVehicle(${i})">X</button>
                     </td>
                 </tr>`;
             }
         });
-        document.getElementById('total-owed').innerText = `Total: $${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        document.getElementById('paid-count').innerText = `Paid: ${paidC} / ${fleet.length}`;
+        
+        document.getElementById('total-paid').innerText = `$${totalPaidAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        document.getElementById('total-owed').innerText = `$${totalOwedAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        document.getElementById('paid-count').innerText = `Fleet Count: ${fleet.length}`;
         document.getElementById('delCol').style.display = isLocked ? 'none' : 'table-cell';
     }
 
     function checkPin() {
         if (!isLocked) { toggleLock(); return; }
-        const entry = prompt("Enter PIN to manage fleet:");
+        const entry = prompt("Enter PIN:");
         if (entry === SECRET_PIN) toggleLock();
-        else if (entry !== null) alert("Incorrect PIN");
+        else if (entry !== null) alert("Wrong PIN");
     }
 
     function togglePaid(i) {
@@ -202,7 +220,7 @@
     }
 
     function removeVehicle(i) {
-        if(confirm(`Remove this vehicle?`)) {
+        if(confirm(`Remove vehicle?`)) {
             fleet.splice(i, 1);
             saveAndRender();
         }
@@ -210,6 +228,14 @@
 
     function updateSyncStatus(text, color) {
         document.getElementById('sync-status').innerHTML = `<span class="dot" style="background:${color}"></span> ${text}`;
+    }
+
+    function exportJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fleet));
+        const dl = document.createElement('a');
+        dl.setAttribute("href", dataStr);
+        dl.setAttribute("download", "956_fleet_backup.json");
+        dl.click();
     }
 
     function importJSON(event) {
