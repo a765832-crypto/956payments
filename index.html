@@ -64,7 +64,7 @@
 </div>
 
 <script>
-    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwDfQyEHHohqF4V3MJUW-ODhoKVKPELe5PfZf0F-atyOYyjulwznUxJ7MNk4UJARQT_zA/exec";
+    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbyP6nQ2N6omu999JavkzIssK0DttY0gaWbPcgDymzK-AMY-yBuCktoCWUWcm15-opQLAQ/exec";
     const SECRET_PIN = "0956";
     let isLocked = true;
     let fleet = [];
@@ -104,10 +104,11 @@
     }
 
     async function pushToCloud() {
-        updateSyncStatus("Saving Log...", "#f1c40f");
+        updateSyncStatus("Saving & Logging...", "#f1c40f");
         try {
             await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(fleet) });
-            updateSyncStatus("History Updated", "#27ae60");
+            updateSyncStatus("Synced to History", "#27ae60");
+            setTimeout(loadFromCloud, 1500);
         } catch (e) { updateSyncStatus("Error", "#e74c3c"); }
     }
 
@@ -166,13 +167,6 @@
         saveAndRender();
     }
 
-    function removeVehicle(i) {
-        if(confirm(`Remove vehicle?`)) {
-            fleet.splice(i, 1);
-            saveAndRender();
-        }
-    }
-
     function updateSyncStatus(text, color) {
         document.getElementById('sync-status').innerHTML = `<span class="dot" style="background:${color}"></span> ${text}`;
     }
@@ -189,12 +183,6 @@
         link.setAttribute("href", URL.createObjectURL(blob));
         link.setAttribute("download", `956_Rideco_Report_${new Date().getMonth()+1}_${new Date().getFullYear()}.csv`);
         link.click();
-    }
-
-    function exportJSON() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fleet));
-        const dl = document.createElement('a');
-        dl.setAttribute("href", dataStr); dl.setAttribute("download", "956_fleet_backup.json"); dl.click();
     }
 
     function importJSON(event) {
