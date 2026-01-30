@@ -76,7 +76,7 @@
 </div>
 
 <script>
-    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzeDhSsvYWjbvy58CE8ZnjqDBtiMKtMKFdbM2XkVQ0MYyez2kjj_WGAzU0eAASyf2OwYQ/exec";
+    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbw8ji2cltbUHvc8NeaBBuJqAX5FYMEVtGYFNEUFIZZrXIVoqUEz4X-NhWlRAUqtksRB3w/exec";
     const SECRET_PIN = "0956";
     let isLocked = true;
     let fleet = [];
@@ -116,7 +116,7 @@
     }
 
     async function pushToCloud() {
-        updateSyncStatus("Saving Log...", "#f1c40f");
+        updateSyncStatus("Syncing Logs...", "#f1c40f");
         try {
             await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(fleet) });
             updateSyncStatus("Synced", "#27ae60");
