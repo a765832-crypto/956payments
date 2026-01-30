@@ -8,28 +8,21 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 10px; color: #333; margin: 0; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 1450px; margin: auto; }
         .flex-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
-        
-        /* Stats Styling */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: right; }
         .stat-box { background: #f8f9fa; padding: 8px 12px; border-radius: 8px; border: 1px solid #eee; }
         .stat-label { font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; }
         .stat-value { font-size: 16px; font-weight: 800; }
-
         .search-box { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px; font-size: 16px; box-sizing: border-box; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
         .btn { cursor: pointer; border-radius: 8px; padding: 12px; border: none; font-weight: bold; font-size: 14px; text-align: center; }
-        
         .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; min-width: 950px; }
         th, td { padding: 15px 10px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #2c3e50; color: white; position: sticky; top: 0; font-size: 12px; }
-        
         .vehicle-name { font-weight: 800; font-size: 18px; text-transform: uppercase; line-height: 1.1; }
-        .paid-date-text { font-weight: 700; font-size: 17px; color: #2c3e50; white-space: nowrap; }
-
+        .paid-date-text { font-weight: 700; font-size: 17px; color: #2c3e50; }
         input { border: 1px solid transparent; padding: 8px; width: 95%; font-size: 15px; background: transparent; }
         input:disabled { opacity: 1; -webkit-text-fill-color: inherit; color: inherit; }
-
         .status-paid { background: #e8f5e9; }
         #sync-status { font-weight: bold; font-size: 0.85em; display: flex; align-items: center; gap: 5px; margin-bottom: 10px; }
         .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
@@ -44,14 +37,8 @@
             <div id="sync-status"><span class="dot" style="background:#f1c40f"></span> Connecting...</div>
         </div>
         <div class="stats-grid">
-            <div class="stat-box" style="border-left: 4px solid #2ecc71;">
-                <div class="stat-label">Total Paid</div>
-                <div id="total-paid" class="stat-value" style="color: #27ae60;">$0.00</div>
-            </div>
-            <div class="stat-box" style="border-left: 4px solid #e74c3c;">
-                <div class="stat-label">Remaining</div>
-                <div id="total-owed" class="stat-value" style="color: #c0392b;">$0.00</div>
-            </div>
+            <div class="stat-box" style="border-left: 4px solid #2ecc71;"><div class="stat-label">Total Paid</div><div id="total-paid" class="stat-value" style="color: #27ae60;">$0.00</div></div>
+            <div class="stat-box" style="border-left: 4px solid #e74c3c;"><div class="stat-label">Remaining</div><div id="total-owed" class="stat-value" style="color: #c0392b;">$0.00</div></div>
         </div>
     </div>
 
@@ -62,36 +49,25 @@
         <button class="btn" style="background:#3498db; color:white;" onclick="loadFromCloud()">🔄 Refresh</button>
         <button id="addBtn" class="btn" style="background:#2ecc71; color:white; display:none;" onclick="addNewVehicle()">+ Add Vehicle</button>
         <button id="saveCloudBtn" class="btn" style="background:#2ecc71; color:white;" onclick="pushToCloud()" disabled>☁️ Save Cloud</button>
-        <button class="btn" style="background:#f39c12; color:white; grid-column: span 1;" onclick="exportJSON()">💾 DOWNLOAD BACKUP</button>
-        <button class="btn" style="background:#7f8c8d; color:white; grid-column: span 1;" onclick="document.getElementById('restoreFile').click()">📂 RESTORE JSON</button>
+        <button class="btn" style="background:#27ae60; color:white; grid-column: span 2;" onclick="exportCSV()">📊 EXPORT CSV REPORT</button>
+        <button class="btn" style="background:#f39c12; color:white;" onclick="exportJSON()">💾 BACKUP JSON</button>
+        <button class="btn" style="background:#7f8c8d; color:white;" onclick="document.getElementById('restoreFile').click()">📂 RESTORE JSON</button>
         <input type="file" id="restoreFile" style="display:none" accept=".json" onchange="importJSON(event)">
     </div>
     
     <div class="table-container">
         <table>
-            <thead>
-                <tr>
-                    <th style="width: 220px;">Vehicle</th>
-                    <th>Bank</th>
-                    <th>Payment</th>
-                    <th>Day</th>
-                    <th style="width: 150px;">Date Paid</th>
-                    <th>Action</th>
-                    <th id="delCol" style="display:none; width: 50px;">Del</th>
-                </tr>
-            </thead>
+            <thead><tr><th style="width: 220px;">Vehicle</th><th>Bank</th><th>Payment</th><th>Day</th><th style="width: 150px;">Date Paid</th><th>Action</th><th id="delCol" style="display:none; width: 50px;">Del</th></tr></thead>
             <tbody id="tableBody"></tbody>
         </table>
     </div>
 </div>
 
 <script>
-    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzs3Y76VOyP3Vlj7Ka_IVt6-ycs9Yj91kTNRplMM1tjq0gBsynyZiVUjNT6pMbGyamq/exec";
+    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwDfQyEHHohqF4V3MJUW-ODhoKVKPELe5PfZf0F-atyOYyjulwznUxJ7MNk4UJARQT_zA/exec";
     const SECRET_PIN = "0956";
-    
     let isLocked = true;
     let fleet = [];
-    const today = new Date().getDate();
 
     function getVehicleColor(name) {
         const n = name.toLowerCase();
@@ -107,17 +83,9 @@
 
     function formatDateClean(dateStr) {
         if (!dateStr || dateStr === "N/A" || dateStr === "") return "-";
-        try {
-            const date = new Date(dateStr);
-            if (isNaN(date.getTime())) {
-                 let parts = dateStr.split(/[T\s]/)[0].split(/[-/]/);
-                 if (parts.length === 3) return `${parts[1]}/${parts[2]}/${parts[0]}`;
-                 return dateStr;
-            }
-            return (date.getMonth() + 1).toString().padStart(2, '0') + '/' + 
-                   date.getDate().toString().padStart(2, '0') + '/' + 
-                   date.getFullYear();
-        } catch (e) { return dateStr; }
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        return (date.getMonth() + 1).toString().padStart(2, '0') + '/' + date.getDate().toString().padStart(2, '0') + '/' + date.getFullYear();
     }
 
     async function loadFromCloud() {
@@ -126,8 +94,8 @@
             const res = await fetch(CLOUD_URL);
             const data = await res.json();
             fleet = data.map(r => ({
-                name: r.vehicle || r.name || "New Car", bank: r.bank || "", amount: parseFloat(r.amount) || 0,
-                dueDay: parseInt(r.dueday || r.dueDay) || 1, paid: String(r.paid).toUpperCase() === "TRUE",
+                name: r.vehicle || r.name, bank: r.bank, amount: parseFloat(r.amount),
+                dueDay: parseInt(r.dueday || r.dueDay), paid: String(r.paid).toUpperCase() === "TRUE",
                 paidDate: r.paiddate || r.paidDate || ""
             }));
             saveAndRender();
@@ -136,11 +104,10 @@
     }
 
     async function pushToCloud() {
-        updateSyncStatus("Saving...", "#f1c40f");
+        updateSyncStatus("Saving Log...", "#f1c40f");
         try {
             await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(fleet) });
-            updateSyncStatus("Saved", "#27ae60");
-            setTimeout(loadFromCloud, 1000);
+            updateSyncStatus("History Updated", "#27ae60");
         } catch (e) { updateSyncStatus("Error", "#e74c3c"); }
     }
 
@@ -149,61 +116,41 @@
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const body = document.getElementById('tableBody');
         body.innerHTML = '';
-        
-        let totalPaidAmt = 0;
-        let totalOwedAmt = 0;
-        let count = 0;
+        let totalPaidAmt = 0; let totalOwedAmt = 0;
         
         fleet.forEach((car, i) => {
             if (car.name.toLowerCase().includes(searchTerm) || car.bank.toLowerCase().includes(searchTerm)) {
-                const amt = parseFloat(car.amount) || 0;
-                
-                // Don't count Jaime's Palisade in financial stats
                 if (car.name !== "Jaime Palisade 2021") {
-                    if (car.paid) totalPaidAmt += amt;
-                    else totalOwedAmt += amt;
+                    if (car.paid) totalPaidAmt += car.amount;
+                    else totalOwedAmt += car.amount;
                 }
-                
-                count++;
                 let sClass = car.paid ? "status-paid" : "";
                 let vColor = getVehicleColor(car.name);
-
                 body.innerHTML += `<tr class="${sClass}">
-                    <td class="vehicle-name" style="color:${vColor}">
-                        ${isLocked ? car.name : `<input value="${car.name}" oninput="fleet[${i}].name=this.value">`}
-                    </td>
+                    <td class="vehicle-name" style="color:${vColor}">${isLocked ? car.name : `<input value="${car.name}" oninput="fleet[${i}].name=this.value">`}</td>
                     <td><input value="${car.bank}" ${isLocked?'disabled':''} oninput="fleet[${i}].bank=this.value"></td>
                     <td>$<input type="number" value="${car.amount}" ${isLocked?'disabled':''} oninput="fleet[${i}].amount=parseFloat(this.value)"></td>
                     <td><input type="number" value="${car.dueDay}" ${isLocked?'disabled':''} oninput="fleet[${i}].dueDay=parseInt(this.value)"></td>
-                    <td>
-                        ${isLocked ? `<span class="paid-date-text">${formatDateClean(car.paidDate)}</span>` : `<input type="date" value="${car.paidDate.split('T')[0]}" oninput="fleet[${i}].paidDate=this.value">`}
-                    </td>
+                    <td>${isLocked ? `<span class="paid-date-text">${formatDateClean(car.paidDate)}</span>` : `<input type="date" value="${car.paidDate.split('T')[0]}" oninput="fleet[${i}].paidDate=this.value">`}</td>
                     <td><button class="btn" style="background:#2ecc71; color:white; width: 100%;" onclick="togglePaid(${i})">${car.paid?'Undo':'Paid'}</button></td>
-                    <td style="display:${isLocked ? 'none' : 'table-cell'}">
-                        <button class="btn" style="background:#ff4757; color:white; padding:5px 10px;" onclick="removeVehicle(${i})">X</button>
-                    </td>
+                    <td style="display:${isLocked ? 'none' : 'table-cell'}"><button class="btn" style="background:#ff4757; color:white; padding:5px 10px;" onclick="removeVehicle(${i})">X</button></td>
                 </tr>`;
             }
         });
-        
-        document.getElementById('total-paid').innerText = `$${totalPaidAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        document.getElementById('total-owed').innerText = `$${totalOwedAmt.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-        document.getElementById('paid-count').innerText = `Fleet Count: ${fleet.length}`;
+        document.getElementById('total-paid').innerText = `$${totalPaidAmt.toLocaleString()}`;
+        document.getElementById('total-owed').innerText = `$${totalOwedAmt.toLocaleString()}`;
         document.getElementById('delCol').style.display = isLocked ? 'none' : 'table-cell';
     }
 
     function checkPin() {
-        if (!isLocked) { toggleLock(); return; }
-        const entry = prompt("Enter PIN:");
+        const entry = isLocked ? prompt("Enter PIN:") : "0956";
         if (entry === SECRET_PIN) toggleLock();
-        else if (entry !== null) alert("Wrong PIN");
     }
 
     function togglePaid(i) {
         fleet[i].paid = !fleet[i].paid;
         fleet[i].paidDate = fleet[i].paid ? new Date().toISOString() : "";
-        saveAndRender(); 
-        pushToCloud();
+        saveAndRender(); pushToCloud();
     }
 
     function toggleLock() {
@@ -230,12 +177,24 @@
         document.getElementById('sync-status').innerHTML = `<span class="dot" style="background:${color}"></span> ${text}`;
     }
 
+    function exportCSV() {
+        let csv = "Vehicle,Bank,Amount,Due Day,Status,Date Paid\n";
+        fleet.forEach(c => {
+            const status = c.paid ? "PAID" : "UNPAID";
+            const date = formatDateClean(c.paidDate);
+            csv += `"${c.name}","${c.bank}","${c.amount}","${c.dueDay}","${status}","${date}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.setAttribute("href", URL.createObjectURL(blob));
+        link.setAttribute("download", `956_Rideco_Report_${new Date().getMonth()+1}_${new Date().getFullYear()}.csv`);
+        link.click();
+    }
+
     function exportJSON() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fleet));
         const dl = document.createElement('a');
-        dl.setAttribute("href", dataStr);
-        dl.setAttribute("download", "956_fleet_backup.json");
-        dl.click();
+        dl.setAttribute("href", dataStr); dl.setAttribute("download", "956_fleet_backup.json"); dl.click();
     }
 
     function importJSON(event) {
