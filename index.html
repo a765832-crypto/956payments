@@ -26,9 +26,15 @@
         .status-paid { background: #e8f5e9; }
         #sync-status { font-weight: bold; font-size: 0.85em; display: flex; align-items: center; gap: 5px; margin-bottom: 10px; }
         .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
+        
+        /* History Modal Styling */
+        #historyLog { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); width:90%; max-width:500px; background:white; padding:20px; border-radius:15px; box-shadow:0 0 20px rgba(0,0,0,0.3); z-index:1000; }
+        .overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; }
     </style>
 </head>
 <body>
+
+<div class="overlay" id="overlay" onclick="closeHistory()"></div>
 
 <div class="card">
     <div class="flex-header">
@@ -49,6 +55,7 @@
         <button class="btn" style="background:#3498db; color:white;" onclick="loadFromCloud()">🔄 Refresh</button>
         <button id="addBtn" class="btn" style="background:#2ecc71; color:white; display:none;" onclick="addNewVehicle()">+ Add Vehicle</button>
         <button id="saveCloudBtn" class="btn" style="background:#2ecc71; color:white;" onclick="pushToCloud()" disabled>☁️ Save Cloud</button>
+        <button class="btn" style="background:#2c3e50; color:white; grid-column: span 2;" onclick="fetchHistory()">📜 VIEW RECENT HISTORY LOG</button>
         <button class="btn" style="background:#27ae60; color:white; grid-column: span 2;" onclick="exportCSV()">📊 EXPORT CSV REPORT</button>
         <button class="btn" style="background:#f39c12; color:white;" onclick="exportJSON()">💾 BACKUP JSON</button>
         <button class="btn" style="background:#7f8c8d; color:white;" onclick="document.getElementById('restoreFile').click()">📂 RESTORE JSON</button>
@@ -63,8 +70,14 @@
     </div>
 </div>
 
+<div id="historyLog">
+    <h3 style="margin-top:0">Recent Payment History</h3>
+    <div id="historyContent" style="font-size:13px; max-height:350px; overflow-y:auto; border:1px solid #eee; padding:10px; border-radius:8px;"></div>
+    <button class="btn" style="background:#e74c3c; color:white; margin-top:15px; width:100%" onclick="closeHistory()">Close</button>
+</div>
+
 <script>
-    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbyP6nQ2N6omu999JavkzIssK0DttY0gaWbPcgDymzK-AMY-yBuCktoCWUWcm15-opQLAQ/exec";
+    const CLOUD_URL = "https://script.google.com/macros/s/AKfycbzS2XUQK_p610bWpTuMqO6UJyA4tJv7uHxL8tSEOrcCF8ASdkvrHANIWO0glR2yhhpaLw/exec";
     const SECRET_PIN = "0956";
     let isLocked = true;
     let fleet = [];
@@ -104,12 +117,34 @@
     }
 
     async function pushToCloud() {
-        updateSyncStatus("Saving & Logging...", "#f1c40f");
+        updateSyncStatus("Saving Log...", "#f1c40f");
         try {
             await fetch(CLOUD_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(fleet) });
-            updateSyncStatus("Synced to History", "#27ae60");
-            setTimeout(loadFromCloud, 1500);
+            updateSyncStatus("Synced", "#27ae60");
+            setTimeout(loadFromCloud, 1000);
         } catch (e) { updateSyncStatus("Error", "#e74c3c"); }
+    }
+
+    async function fetchHistory() {
+        document.getElementById('historyLog').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+        const content = document.getElementById('historyContent');
+        content.innerHTML = "Fetching logs...";
+        try {
+            const res = await fetch(CLOUD_URL + "?action=getHistory");
+            const logs = await res.json();
+            if (logs.length === 0) { content.innerHTML = "No history found."; return; }
+            let html = '<table style="width:100%; border-collapse:collapse;">';
+            logs.forEach(log => {
+                html += `<tr><td style="padding:10px; border-bottom:1px solid #eee"><b>${log[1]}</b><br><small style="color:#666">${formatDateClean(log[4])}</small></td><td style="text-align:right; color:#27ae60; font-weight:bold">$${log[2]}</td></tr>`;
+            });
+            content.innerHTML = html + '</table>';
+        } catch (e) { content.innerHTML = "Unable to load history."; }
+    }
+
+    function closeHistory() {
+        document.getElementById('historyLog').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
     }
 
     function saveAndRender() {
@@ -144,8 +179,9 @@
     }
 
     function checkPin() {
-        const entry = isLocked ? prompt("Enter PIN:") : "0956";
+        const entry = prompt("Enter PIN:");
         if (entry === SECRET_PIN) toggleLock();
+        else if (entry !== null) alert("Incorrect PIN");
     }
 
     function togglePaid(i) {
@@ -167,6 +203,13 @@
         saveAndRender();
     }
 
+    function removeVehicle(i) {
+        if(confirm(`Remove vehicle?`)) {
+            fleet.splice(i, 1);
+            saveAndRender();
+        }
+    }
+
     function updateSyncStatus(text, color) {
         document.getElementById('sync-status').innerHTML = `<span class="dot" style="background:${color}"></span> ${text}`;
     }
@@ -175,14 +218,19 @@
         let csv = "Vehicle,Bank,Amount,Due Day,Status,Date Paid\n";
         fleet.forEach(c => {
             const status = c.paid ? "PAID" : "UNPAID";
-            const date = formatDateClean(c.paidDate);
-            csv += `"${c.name}","${c.bank}","${c.amount}","${c.dueDay}","${status}","${date}"\n`;
+            csv += `"${c.name}","${c.bank}","${c.amount}","${c.dueDay}","${status}","${formatDateClean(c.paidDate)}"\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.setAttribute("href", URL.createObjectURL(blob));
-        link.setAttribute("download", `956_Rideco_Report_${new Date().getMonth()+1}_${new Date().getFullYear()}.csv`);
+        link.setAttribute("download", `956_Report_${new Date().getMonth()+1}_${new Date().getFullYear()}.csv`);
         link.click();
+    }
+
+    function exportJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fleet));
+        const dl = document.createElement('a');
+        dl.setAttribute("href", dataStr); dl.setAttribute("download", "956_fleet_backup.json"); dl.click();
     }
 
     function importJSON(event) {
