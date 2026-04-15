@@ -145,18 +145,22 @@
 
     async function loadFromCloud() {
         updateSyncStatus("Syncing...", "#f1c40f");
+        let data;
         try {
             const res = await fetch(CLOUD_URL);
-            const data = await res.json();
-            fleet = data.map((r, idx) => ({
-                _uid: r._uid || (Date.now() + idx), // FIXED: stable unique ID per vehicle
-                name: r.vehicle || r.name, bank: r.bank, amount: parseFloat(r.amount),
-                dueDay: parseInt(r.dueday || r.dueDay), paid: String(r.paid).toUpperCase() === "TRUE",
-                paidDate: r.paiddate || r.paidDate || ""
-            }));
-            saveAndRender();
-            updateSyncStatus("Cloud Synced", "#27ae60");
-        } catch (e) { updateSyncStatus("Offline", "#e74c3c"); }
+            data = await res.json();
+        } catch (e) {
+            updateSyncStatus("Offline", "#e74c3c");
+            return;
+        }
+        // Parse data outside the network try/catch so render errors surface clearly
+        fleet = data.map(r => ({
+            name: r.vehicle || r.name, bank: r.bank, amount: parseFloat(r.amount),
+            dueDay: parseInt(r.dueday || r.dueDay), paid: String(r.paid).toUpperCase() === "TRUE",
+            paidDate: r.paiddate || r.paidDate || ""
+        }));
+        saveAndRender();
+        updateSyncStatus("Cloud Synced ✓", "#27ae60");
     }
 
     async function pushToCloud() {
@@ -192,15 +196,16 @@
     }
 
     function saveAndRender() {
-        if (isLocked) fleet.sort((a, b) => a.dueDay - b.dueDay);
+        // FIXED: sort a display COPY — never mutate the original fleet array
+        // This keeps fleet indices stable so onclick handlers always point to the right car
+        const displayFleet = isLocked ? [...fleet].sort((a, b) => a.dueDay - b.dueDay) : fleet;
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         const body = document.getElementById('tableBody');
         body.innerHTML = '';
         let totalPaidAmt = 0; let totalOwedAmt = 0;
-        
-        fleet.forEach((car) => {
-            // FIXED: use stable _uid instead of array index to prevent wrong-vehicle toggling after sort
-            const uid = car._uid;
+
+        displayFleet.forEach((car) => {
+            const i = fleet.indexOf(car); // real index in original unsorted array
             if (car.name.toLowerCase().includes(searchTerm) || car.bank.toLowerCase().includes(searchTerm)) {
                 if (car.name !== "Jaime Palisade 2021") {
                     if (car.paid) totalPaidAmt += car.amount;
@@ -208,14 +213,15 @@
                 }
                 let sClass = car.paid ? "status-paid" : "";
                 let vColor = getVehicleColor(car.name);
+                const paidDate = car.paidDate || "";
                 body.innerHTML += `<tr class="${sClass}">
-                    <td class="vehicle-name" style="color:${vColor}">${isLocked ? car.name : `<input value="${car.name}" oninput="fleetByUid(${uid}).name=this.value">`}</td>
-                    <td><input value="${car.bank}" ${isLocked?'disabled':''} oninput="fleetByUid(${uid}).bank=this.value"></td>
-                    <td>$<input type="number" value="${car.amount}" ${isLocked?'disabled':''} oninput="fleetByUid(${uid}).amount=parseFloat(this.value)"></td>
-                    <td><input type="number" value="${car.dueDay}" ${isLocked?'disabled':''} oninput="fleetByUid(${uid}).dueDay=parseInt(this.value)"></td>
-                    <td>${isLocked ? `<span class="paid-date-text">${formatDateClean(car.paidDate)}</span>` : `<input type="date" value="${car.paidDate.split('T')[0]}" oninput="fleetByUid(${uid}).paidDate=this.value">`}</td>
-                    <td><button class="btn" style="background:${car.paid?'#e74c3c':'#2ecc71'}; color:white; width:100%;" onclick="togglePaid(${uid})" id="btn-${uid}">${car.paid?'Undo':'Paid'}</button></td>
-                    <td style="display:${isLocked ? 'none' : 'table-cell'}"><button class="btn" style="background:#ff4757; color:white; padding:5px 10px;" onclick="removeVehicle(${uid})">X</button></td>
+                    <td class="vehicle-name" style="color:${vColor}">${isLocked ? car.name : `<input value="${car.name}" oninput="fleet[${i}].name=this.value">`}</td>
+                    <td><input value="${car.bank}" ${isLocked?'disabled':''} oninput="fleet[${i}].bank=this.value"></td>
+                    <td>$<input type="number" value="${car.amount}" ${isLocked?'disabled':''} oninput="fleet[${i}].amount=parseFloat(this.value)"></td>
+                    <td><input type="number" value="${car.dueDay}" ${isLocked?'disabled':''} oninput="fleet[${i}].dueDay=parseInt(this.value)"></td>
+                    <td>${isLocked ? `<span class="paid-date-text">${formatDateClean(paidDate)}</span>` : `<input type="date" value="${paidDate.split('T')[0]}" oninput="fleet[${i}].paidDate=this.value">`}</td>
+                    <td><button class="btn" style="background:${car.paid?'#e74c3c':'#2ecc71'}; color:white; width:100%;" onclick="togglePaid(${i})" id="btn-${i}">${car.paid?'Undo':'Paid'}</button></td>
+                    <td style="display:${isLocked ? 'none' : 'table-cell'}"><button class="btn" style="background:#ff4757; color:white; padding:5px 10px;" onclick="removeVehicle(${i})">X</button></td>
                 </tr>`;
             }
         });
@@ -224,32 +230,24 @@
         document.getElementById('delCol').style.display = isLocked ? 'none' : 'table-cell';
     }
 
-    // FIXED: look up vehicle by stable UID, not array index
-    function fleetByUid(uid) {
-        return fleet.find(c => c._uid === uid);
-    }
-
-    function togglePaid(uid) {
-        // Guard: disable button immediately to prevent double-click duplicates
-        const btn = document.getElementById('btn-' + uid);
+    function togglePaid(i) {
+        // Guard: disable button to prevent double-click duplicates
+        const btn = document.getElementById('btn-' + i);
         if (btn) btn.disabled = true;
-
-        const car = fleetByUid(uid);
-        if (!car) return;
-        car.paid = !car.paid;
-        car.paidDate = car.paid ? new Date().toISOString() : "";
+        fleet[i].paid = !fleet[i].paid;
+        fleet[i].paidDate = fleet[i].paid ? new Date().toISOString() : "";
         saveAndRender();
         pushToCloud();
     }
 
     function addNewVehicle() {
-        fleet.push({ _uid: Date.now(), name: "NEW CAR", bank: "BANK", amount: 0, dueDay: 1, paid: false, paidDate: "" });
+        fleet.push({ name: "NEW CAR", bank: "BANK", amount: 0, dueDay: 1, paid: false, paidDate: "" });
         saveAndRender();
     }
 
-    function removeVehicle(uid) {
+    function removeVehicle(i) {
         if(confirm(`Remove vehicle?`)) {
-            fleet = fleet.filter(c => c._uid !== uid);
+            fleet.splice(i, 1);
             saveAndRender();
         }
     }
